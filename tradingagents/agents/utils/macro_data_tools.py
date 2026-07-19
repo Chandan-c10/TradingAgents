@@ -61,6 +61,60 @@ def get_fii_dii_flows() -> str:
 
 
 @tool
+def get_past_research_history() -> str:
+    """
+    Retrieve this desk's own past research sessions for the SAME instrument —
+    what was previously predicted (rating, entry/target/stop, confidence) and,
+    where the outcome has since resolved, whether real price action actually
+    hit the target, hit the stop, or expired unresolved. Call this early when
+    analyzing any symbol: a track record of past predictions being validated
+    or invalidated is direct evidence about how reliable this desk's analysis
+    has been on this specific instrument.
+
+    Like get_fii_dii_flows, this isn't fetched live per call: the host
+    application pre-fetches past matching sessions once per run and hands
+    them over via environment variable, so this simply formats whatever was
+    provided — or reports no history if this is the first time the
+    instrument has been analyzed, or the host hasn't set it.
+
+    Returns:
+        str: A markdown table of up to 5 past sessions for this instrument
+        (most recent first), or a message noting no history is available.
+    """
+    raw = os.environ.get("PAST_SESSIONS_JSON")
+    if not raw:
+        return "No past research history found for this instrument (first time analyzing it, or none yet resolved)."
+    try:
+        sessions = json.loads(raw)
+    except ValueError:
+        return "Past research history is unavailable (malformed data)."
+
+    if not isinstance(sessions, list) or not sessions:
+        return "No past research history found for this instrument."
+
+    lines = [
+        "## Past Research History (this instrument)",
+        "| Date | Rating | Confidence | Entry | Target | Stop | Outcome |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for s in sessions:
+        status = s.get("outcome_status") or "pending"
+        outcome = status
+        if status in ("target_hit", "stop_hit") and s.get("outcome_price") is not None:
+            outcome = f"{status} @ {s['outcome_price']}"
+        if status == "target_hit":
+            outcome += " ✅"
+        elif status == "stop_hit":
+            outcome += " ❌"
+        lines.append(
+            f"| {s.get('analysis_date', '?')} | {s.get('final_rating', '?')} | "
+            f"{s.get('confidence_score', '?')} | {s.get('entry_price', '?')} | "
+            f"{s.get('target_price_1', '?')} | {s.get('stop_loss_price', '?')} | {outcome} |"
+        )
+    return "\n".join(lines)
+
+
+@tool
 def get_macro_indicators(
     indicator: Annotated[
         str,

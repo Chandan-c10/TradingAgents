@@ -15,14 +15,15 @@ from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_balance_sheet,
     get_cashflow,
+    get_fii_dii_flows,
     get_fundamentals,
     get_global_news,
     get_income_statement,
     get_indicators,
-    get_fii_dii_flows,
     get_insider_transactions,
     get_macro_indicators,
     get_news,
+    get_past_research_history,
     get_prediction_markets,
     get_stock_data,
     get_verified_market_snapshot,
@@ -207,6 +208,10 @@ class TradingAgentsGraph:
                     # app pre-fetches this once per session via env var; reports
                     # itself unavailable if unset rather than failing.
                     get_fii_dii_flows,
+                    # This desk's own past predictions/outcomes for the same
+                    # instrument — also pre-fetched via env var, reports "no
+                    # history" gracefully when this is a first-time symbol.
+                    get_past_research_history,
                 ]
             ),
             "social": ToolNode(

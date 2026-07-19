@@ -6,6 +6,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
     get_macro_indicators,
+    get_past_research_history,
     get_stock_data,
     get_verified_market_snapshot,
 )
@@ -23,6 +24,7 @@ def create_market_analyst(llm):
             get_verified_market_snapshot,
             get_macro_indicators,
             get_fii_dii_flows,
+            get_past_research_history,
         ]
 
         system_message = (
@@ -53,6 +55,8 @@ Volume-Based Indicators:
 - Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_stock_data first to retrieve the CSV that is needed to generate indicators. Then use get_indicators with the specific indicator names.
 
 Before writing the final report, call get_verified_market_snapshot for this ticker and the current date, and treat it as the source of truth for any exact OHLCV, price-level, or indicator-value claim. If another tool's output conflicts with the verified snapshot, flag the discrepancy rather than inventing a reconciled number. Do not claim historical validation, support/resistance bounces, or exact percentage moves unless they are directly supported by tool output with concrete dates and prices.
+
+Early in your analysis, call get_past_research_history to see what this desk previously concluded about this same instrument, and — where a past prediction has since resolved — whether real price action validated it (target hit) or invalidated it (stop hit). Weigh a track record of validated predictions as support for higher confidence, and a track record of invalidated ones as a reason for caution, rather than ignoring this desk's own prior calls on this instrument. Skip this if the tool reports no history.
 
 If macro conditions are relevant to this instrument (e.g. rate-sensitive sectors, currency-exposed names), call get_macro_indicators for the relevant series (CPI, fed_funds_rate, unemployment, GDP, etc.) and factor real current readings into your trend assessment. Skip this if the macro backdrop isn't relevant to the analysis, or if the tool reports it's unavailable.
 
