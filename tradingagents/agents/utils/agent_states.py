@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from langgraph.graph import MessagesState
 from typing_extensions import TypedDict
@@ -74,3 +74,14 @@ class AgentState(MessagesState):
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
     past_context: Annotated[str, "Memory log context injected at run start (same-ticker decisions + cross-ticker lessons)"]
+
+    # Structured fields from the Portfolio Manager's typed output (schemas.PortfolioDecision),
+    # populated only when the structured call succeeded — None on free-text fallback. Kept as
+    # flat, plain-typed state keys (rather than the Pydantic object itself) so downstream
+    # consumers get real typed values without depending on the schemas module or re-parsing
+    # final_trade_decision's markdown.
+    confidence_score: Annotated[Optional[int], "Portfolio Manager's confidence 0-100, if determinable"]
+    time_horizon: Annotated[Optional[str], "Recommended holding-period bucket, if determinable"]
+    bullish_scenario: Annotated[Optional[str], "What has to go right for the bullish case"]
+    bearish_scenario: Annotated[Optional[str], "What would invalidate the thesis"]
+    key_risks: Annotated[Optional[list], "Concrete risks to the position, as short bullet strings"]

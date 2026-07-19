@@ -17,7 +17,7 @@ from tradingagents.agents.utils.agent_utils import (
 )
 from tradingagents.agents.utils.structured import (
     bind_structured,
-    invoke_structured_or_freetext,
+    invoke_structured,
 )
 
 
@@ -61,9 +61,18 @@ def create_portfolio_manager(llm):
 
 ---
 
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+Be decisive and ground every conclusion in specific evidence from the analysts.
 
-        final_trade_decision = invoke_structured_or_freetext(
+In addition to the rating and summary above, provide:
+- **bullish_scenario**: one concise paragraph on what has to go right for this position to work out, grounded in specific catalysts from the debate.
+- **bearish_scenario**: one concise paragraph on what would invalidate this thesis, grounded in specific risks from the debate.
+- **key_risks**: 2-5 concrete, specific risks (not generic boilerplate), each traceable to something in the analysts' reports or the risk debate.
+- **confidence_score**: 0-100, based on how much the risk debate converged versus stayed split, and how much corroborating evidence exists. A sharply divided debate should score low even with a decisive rating.
+- **time_horizon**: exactly one of "Swing (days-weeks)", "Short-term (weeks-months)", or "Long-term (months+)" — never imply an intraday or scalp horizon, this analysis is not suited for that timeframe.
+
+Omit any of the five fields above you genuinely cannot support with real evidence from the debate — do not guess or fabricate a value just to fill the field.{get_language_instruction()}"""
+
+        final_trade_decision, decision_obj = invoke_structured(
             structured_llm,
             llm,
             prompt,
@@ -87,6 +96,11 @@ Be decisive and ground every conclusion in specific evidence from the analysts.{
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": final_trade_decision,
+            "confidence_score": decision_obj.confidence_score if decision_obj else None,
+            "time_horizon": decision_obj.time_horizon.value if decision_obj and decision_obj.time_horizon else None,
+            "bullish_scenario": decision_obj.bullish_scenario if decision_obj else None,
+            "bearish_scenario": decision_obj.bearish_scenario if decision_obj else None,
+            "key_risks": decision_obj.key_risks if decision_obj else None,
         }
 
     return portfolio_manager_node
