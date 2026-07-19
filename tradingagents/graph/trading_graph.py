@@ -19,6 +19,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_global_news,
     get_income_statement,
     get_indicators,
+    get_fii_dii_flows,
     get_insider_transactions,
     get_macro_indicators,
     get_news,
@@ -202,6 +203,10 @@ class TradingAgentsGraph:
                     # also bound to News Analyst; requires FRED_API_KEY or the
                     # vendor reports itself unavailable rather than failing.
                     get_macro_indicators,
+                    # NSE institutional flow context (India instruments only) — host
+                    # app pre-fetches this once per session via env var; reports
+                    # itself unavailable if unset rather than failing.
+                    get_fii_dii_flows,
                 ]
             ),
             "social": ToolNode(
