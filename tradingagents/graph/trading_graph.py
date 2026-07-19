@@ -198,6 +198,10 @@ class TradingAgentsGraph:
                     # LLM and required by its prompt; must be executable here or
                     # the call fails and the model reports it "unavailable").
                     get_verified_market_snapshot,
+                    # Macro context (rate-sensitive/currency-exposed instruments) —
+                    # also bound to News Analyst; requires FRED_API_KEY or the
+                    # vendor reports itself unavailable rather than failing.
+                    get_macro_indicators,
                 ]
             ),
             "social": ToolNode(
