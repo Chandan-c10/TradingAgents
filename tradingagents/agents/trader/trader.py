@@ -13,7 +13,7 @@ from tradingagents.agents.utils.agent_utils import (
 )
 from tradingagents.agents.utils.structured import (
     bind_structured,
-    invoke_structured_or_freetext,
+    invoke_structured,
 )
 
 
@@ -48,7 +48,7 @@ def create_trader(llm):
             },
         ]
 
-        trader_plan = invoke_structured_or_freetext(
+        trader_plan, proposal_obj = invoke_structured(
             structured_llm,
             llm,
             messages,
@@ -60,6 +60,9 @@ def create_trader(llm):
             "messages": [AIMessage(content=trader_plan)],
             "trader_investment_plan": trader_plan,
             "sender": name,
+            "trader_action":      proposal_obj.action.value if proposal_obj else None,
+            "trader_entry_price": proposal_obj.entry_price   if proposal_obj else None,
+            "trader_stop_loss":   proposal_obj.stop_loss     if proposal_obj else None,
         }
 
     return functools.partial(trader_node, name="Trader")
