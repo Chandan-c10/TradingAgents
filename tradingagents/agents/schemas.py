@@ -185,6 +185,20 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
 # ---------------------------------------------------------------------------
 
 
+class TimeHorizon(str, Enum):
+    """Closed set of holding-period buckets the Portfolio Manager may pick.
+
+    Deliberately excludes any intraday/scalp option: this pipeline analyzes
+    daily-bar data and takes minutes per run, so it isn't the right tool for
+    a horizon measured in minutes or hours. Downstream consumers should never
+    have to guard against an intraday value showing up here.
+    """
+
+    SWING = "Swing (days-weeks)"
+    SHORT_TERM = "Short-term (weeks-months)"
+    LONG_TERM = "Long-term (months+)"
+
+
 class PortfolioDecision(BaseModel):
     """Structured output produced by the Portfolio Manager.
 
@@ -192,6 +206,11 @@ class PortfolioDecision(BaseModel):
     extraction pass is required. Field descriptions double as the model's
     output instructions, so the prompt body only needs to convey context and
     the rating-scale guidance.
+
+    Numeric trade levels (entry/target/stop/support/resistance) are
+    deliberately NOT modeled here: those are computed downstream from real
+    price data, not left to the LLM to invent. This schema only carries the
+    qualitative judgment a language model is actually suited to produce.
     """
 
     rating: PortfolioRating = Field(
@@ -217,14 +236,68 @@ class PortfolioDecision(BaseModel):
         default=None,
         description="Optional target price in the instrument's quote currency.",
     )
-    time_horizon: str | None = Field(
+    time_horizon: TimeHorizon | None = Field(
         default=None,
-        description="Optional recommended holding period, e.g. '3-6 months'.",
+        description=(
+            "Recommended holding-period bucket. Exactly one of Swing "
+            "(days-weeks) / Short-term (weeks-months) / Long-term (months+). "
+            "Never imply an intraday or scalp horizon — this analysis is not "
+            "suited for that timeframe. Omit if the debate doesn't support a "
+            "clear holding-period view."
+        ),
+    )
+    confidence_score: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description=(
+            "Confidence in this decision, 0-100. Base it on how much the risk "
+            "debate converged versus stayed split, and how much corroborating "
+            "evidence the analysts' reports provide. A debate that ended sharply "
+            "divided should score low even if the rating itself is decisive. "
+            "Omit only if you genuinely cannot form a view."
+        ),
+    )
+    bullish_scenario: str | None = Field(
+        default=None,
+        description=(
+            "One concise paragraph: what has to go right for this position to "
+            "work out. Ground it in specific catalysts or conditions raised in "
+            "the debate, not generic optimism. Omit if the debate gave no real "
+            "bullish case to summarize."
+        ),
+    )
+    bearish_scenario: str | None = Field(
+        default=None,
+        description=(
+            "One concise paragraph: what would invalidate this thesis. Ground it "
+            "in specific risks or conditions raised in the debate, not generic "
+            "caution. Omit if the debate gave no real bearish case to summarize."
+        ),
+    )
+    key_risks: list[str] | None = Field(
+        default=None,
+        description=(
+            "2-5 concrete, specific risks to this position as short bullet "
+            "points (not generic boilerplate like 'market risk'). Each should "
+            "be traceable to something raised in the analysts' reports or the "
+            "risk debate. Omit if nothing specific enough was surfaced."
+        ),
     )
 
     @field_validator("price_target", mode="before")
     @classmethod
     def _nullish_float_to_none(cls, v):
+        return _coerce_optional_float(v)
+
+    @field_validator("confidence_score", mode="before")
+    @classmethod
+    def _nullish_int_to_none(cls, v):
+        return _coerce_optional_float(v)
+
+    @field_validator("time_horizon", mode="before")
+    @classmethod
+    def _nullish_horizon_to_none(cls, v):
         return _coerce_optional_float(v)
 
 
@@ -234,7 +307,9 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     Memory log, CLI display, and saved report files all read this markdown,
     so the rendered output preserves the exact section headers (``**Rating**``,
     ``**Executive Summary**``, ``**Investment Thesis**``) that downstream
-    parsers and the report writers already handle.
+    parsers and the report writers already handle. New fields are appended
+    after the original ones so existing readers of the leading sections are
+    unaffected.
     """
     parts = [
         f"**Rating**: {decision.rating.value}",
@@ -246,7 +321,16 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     if decision.price_target is not None:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
-        parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+        parts.extend(["", f"**Time Horizon**: {decision.time_horizon.value}"])
+    if decision.confidence_score is not None:
+        parts.extend(["", f"**Confidence Score**: {decision.confidence_score}/100"])
+    if decision.bullish_scenario:
+        parts.extend(["", f"**Bullish Scenario**: {decision.bullish_scenario}"])
+    if decision.bearish_scenario:
+        parts.extend(["", f"**Bearish Scenario**: {decision.bearish_scenario}"])
+    if decision.key_risks:
+        parts.extend(["", "**Key Risks**:"])
+        parts.extend(f"- {risk}" for risk in decision.key_risks)
     return "\n".join(parts)
 
 
